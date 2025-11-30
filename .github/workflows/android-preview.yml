@@ -1,0 +1,64 @@
+name: Live Preview (Commit)
+
+# TRIGGER: Runs on ANY push to ANY branch
+on:
+  push:
+    branches:
+      - '**'
+
+permissions:
+  contents: write # Required to post comments on commits
+
+jobs:
+  build-and-preview:
+    name: Build & Preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      # Build Release APK
+      - name: 🔨 Build APK
+        run: flutter build apk --release
+
+      # --- NEW STEP: Use the Official Action ---
+      - name: 📱 Upload to Appetize
+        id: appetize # ID is important so we can read the output later
+        uses: appetizeio/github-action-appetize@v1.0.5
+        with:
+          apiToken: ${{ secrets.APPETIZE_TOKEN }}
+          appFile: "build/app/outputs/flutter-apk/app-release.apk"
+          platform: "android"
+          note: "Commit: ${{ github.sha }}"
+
+      # --- COMMENT STEP ---
+      - name: 💬 Post Preview Link
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # We get the PublicKey from the previous step using 'steps.appetize.outputs.publicKey'
+          PUBLIC_KEY: ${{ steps.appetize.outputs.publicKey }}
+        run: |
+          # Construct the link
+          PREVIEW_URL="https://appetize.io/embed/$PUBLIC_KEY?device=pixel7&scale=75&autoplay=true&orientation=portrait&osVersion=13.0"
+          
+          echo "✅ Link Generated: $PREVIEW_URL"
+
+          # Post Comment to Commit
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
+            -f body="### 📱 Mobile Preview Ready
+            **Branch:** \`${{ github.ref_name }}\`
+            
+            [**▶️ Click here to Test this Commit**]($PREVIEW_URL)"
