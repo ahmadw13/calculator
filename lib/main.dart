@@ -170,7 +170,6 @@ class _CalculatorState extends State<Calculator> {
               buildButton("+", amberBtn, Colors.white),
             ]),
             Row(children: [
-              // To make the 0 button wider (stadium shape), we need a slight tweak. 
               // For now, let's keep it simple with a circle logic 
               buildButton("0", greyBtn, Colors.white),
               buildButton("00", greyBtn, Colors.white),
