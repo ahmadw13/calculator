@@ -11,10 +11,8 @@ class CalculatorApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Calculator',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      title: 'Modern Calculator',
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: const Calculator(),
     );
   }
@@ -28,16 +26,16 @@ class Calculator extends StatefulWidget {
 }
 
 class _CalculatorState extends State<Calculator> {
-  // Variables to keep track of the math logic
+  // --- Logic Variables ---
   String output = "0";
   String _output = "0";
   double num1 = 0;
   double num2 = 0;
   String operand = "";
 
-  // The logic to handle button presses
+  // --- Logic Function ---
   void buttonPressed(String buttonText) {
-    if (buttonText == "CLEAR") {
+    if (buttonText == "C") {
       _output = "0";
       num1 = 0;
       num2 = 0;
@@ -45,13 +43,12 @@ class _CalculatorState extends State<Calculator> {
     } else if (buttonText == "+" ||
         buttonText == "-" ||
         buttonText == "/" ||
-        buttonText == "X") {
+        buttonText == "x") {
       num1 = double.parse(output);
       operand = buttonText;
       _output = "0";
     } else if (buttonText == ".") {
       if (_output.contains(".")) {
-        // Do nothing if it already has a decimal
         return;
       } else {
         _output = _output + buttonText;
@@ -65,7 +62,7 @@ class _CalculatorState extends State<Calculator> {
       if (operand == "-") {
         _output = (num1 - num2).toString();
       }
-      if (operand == "X") {
+      if (operand == "x") {
         _output = (num1 * num2).toString();
       }
       if (operand == "/") {
@@ -76,7 +73,6 @@ class _CalculatorState extends State<Calculator> {
       num2 = 0;
       operand = "";
     } else {
-      // It's a number button
       if (_output == "0") {
         _output = buttonText;
       } else {
@@ -84,80 +80,106 @@ class _CalculatorState extends State<Calculator> {
       }
     }
 
-    // This updates the UI
+    // Remove .0 if the result is a whole number (e.g. 5.0 -> 5)
+    if (_output.endsWith(".0")) {
+       _output = _output.substring(0, _output.length - 2);
+    }
+
     setState(() {
       output = _output;
     });
   }
 
-  // A helper widget to build the buttons uniformly
-  Widget buildButton(String buttonText) {
+  // --- UI Helper Widget ---
+  Widget buildButton(String buttonText, Color buttonColor, Color textColor) {
     return Expanded(
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.all(24.0),
+      child: Container(
+        margin: const EdgeInsets.all(10.0), // Spacing between buttons
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            shape: const CircleBorder(), // Makes the button round
+            backgroundColor: buttonColor,
+            padding: const EdgeInsets.all(20.0),
+          ),
+          onPressed: () => buttonPressed(buttonText),
+          child: Text(
+            buttonText,
+            style: TextStyle(
+              fontSize: 30.0,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
         ),
-        child: Text(
-          buttonText,
-          style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
-        ),
-        onPressed: () => buttonPressed(buttonText),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // We define our colors here for consistency
+    const Color greyBtn = Color(0xFF333333); 
+    const Color amberBtn = Colors.amber;
+    const Color lightGreyBtn = Color(0xFFA5A5A5);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Calculator"),
-      ),
+      backgroundColor: Colors.black, // Dark background
       body: Column(
         children: <Widget>[
-          // The Display Area
-          Container(
-            alignment: Alignment.centerRight,
-            padding:
-                const EdgeInsets.symmetric(vertical: 24.0, horizontal: 12.0),
-            child: Text(
-              output,
-              style:
-                  const TextStyle(fontSize: 48.0, fontWeight: FontWeight.bold),
+          // Display Area
+          Expanded(
+            child: Container(
+              alignment: Alignment.bottomRight,
+              padding: const EdgeInsets.symmetric(
+                  vertical: 24.0, horizontal: 12.0),
+              child: Text(
+                output,
+                style: const TextStyle(
+                  fontSize: 80.0, // Much larger font
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
-          const Expanded(
-            child: Divider(),
-          ),
-          // The Keypad Area
+          
+          // Button Area
           Column(children: [
             Row(children: [
-              buildButton("7"),
-              buildButton("8"),
-              buildButton("9"),
-              buildButton("/")
+              buildButton("C", lightGreyBtn, Colors.black),
+              buildButton("+/-", lightGreyBtn, Colors.black),
+              buildButton("%", lightGreyBtn, Colors.black),
+              buildButton("/", amberBtn, Colors.white),
             ]),
             Row(children: [
-              buildButton("4"),
-              buildButton("5"),
-              buildButton("6"),
-              buildButton("X")
+              buildButton("7", greyBtn, Colors.white),
+              buildButton("8", greyBtn, Colors.white),
+              buildButton("9", greyBtn, Colors.white),
+              buildButton("x", amberBtn, Colors.white),
             ]),
             Row(children: [
-              buildButton("1"),
-              buildButton("2"),
-              buildButton("3"),
-              buildButton("-")
+              buildButton("4", greyBtn, Colors.white),
+              buildButton("5", greyBtn, Colors.white),
+              buildButton("6", greyBtn, Colors.white),
+              buildButton("-", amberBtn, Colors.white),
             ]),
             Row(children: [
-              buildButton("."),
-              buildButton("0"),
-              buildButton("00"),
-              buildButton("+")
+              buildButton("1", greyBtn, Colors.white),
+              buildButton("2", greyBtn, Colors.white),
+              buildButton("3", greyBtn, Colors.white),
+              buildButton("+", amberBtn, Colors.white),
             ]),
             Row(children: [
-              buildButton("CLEAR"),
-              buildButton("="),
-            ])
+              // To make the 0 button wider (stadium shape), we need a slight tweak. 
+              // For now, let's keep it simple with a circle logic 
+              // but we will place two items in the first slot just to fill space or keep it standard.
+              // Let's stick to standard grid for consistency.
+              buildButton("0", greyBtn, Colors.white),
+              buildButton("00", greyBtn, Colors.white),
+              buildButton(".", greyBtn, Colors.white),
+              buildButton("=", amberBtn, Colors.white),
+            ]),
+            const SizedBox(height: 10), // Bottom padding
           ])
         ],
       ),
