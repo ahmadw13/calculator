@@ -135,7 +135,7 @@ class _CalculatorState extends State<Calculator> {
               child: Text(
                 output,
                 style: const TextStyle(
-                  fontSize: 80.0, // Much larger font
+                  fontSize: 80.0, // Much larger f
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
