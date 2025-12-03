@@ -170,7 +170,7 @@ class _CalculatorState extends State<Calculator> {
               buildButton("+", amberBtn, Colors.white),
             ]),
             Row(children: [
-              // For now, let's keep it simple with a circle logic 
+              // For now, let's keep it simple with a circle logi
               buildButton("0", greyBtn, Colors.white),
               buildButton("00", greyBtn, Colors.white),
               buildButton(".", greyBtn, Colors.white),
