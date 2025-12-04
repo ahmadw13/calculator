@@ -1,4 +1,4 @@
-name: BrowserStack Upload
+name: Medical App Live Test
 
 on:
   push:
@@ -28,24 +28,47 @@ jobs:
       - name: 🔨 Build APK
         run: flutter build apk --release
 
+      # --- RENAME STEP (New!) ---
+      - name: 🏷 Rename APK
+        id: rename
+        run: |
+          # 1. Clean branch name (replace / with -)
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          
+          # 2. Define filenames
+          OLD_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          NEW_NAME="MedicalApp_$SAFE_BRANCH.apk"
+          NEW_PATH="build/app/outputs/flutter-apk/$NEW_NAME"
+          
+          # 3. Rename the file
+          mv $OLD_PATH $NEW_PATH
+          
+          echo "✅ Renamed APK to: $NEW_NAME"
+          
+          # 4. Save variables for the next step
+          echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
+          echo "custom_id=MedicalApp_$SAFE_BRANCH" >> $GITHUB_OUTPUT
+
+      # --- UPLOAD STEP (Updated) ---
       - name: ☁️ Upload to BrowserStack API
         id: browserstack
         env:
           BS_USER: ${{ secrets.BROWSERSTACK_USERNAME }}
           BS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
-          BRANCH_NAME: ${{ github.ref_name }}
+          APK_PATH: ${{ steps.rename.outputs.apk_path }}
+          CUSTOM_ID: ${{ steps.rename.outputs.custom_id }}
         run: |
-          echo "🚀 Uploading Branch: $BRANCH_NAME..."
-          SAFE_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
-          CUSTOM_ID="MedicalApp_$SAFE_BRANCH"
-          
+          echo "🚀 Uploading file: $APK_PATH"
+          echo "🏷  Target Custom ID: $CUSTOM_ID"
+
+          # Upload via API (Notice we use $APK_PATH now)
           RESPONSE=$(curl -u "$BS_USER:$BS_KEY" \
             -X POST "https://api-cloud.browserstack.com/app-live/upload" \
-            -F "file=@build/app/outputs/flutter-apk/app-release.apk" \
+            -F "file=@$APK_PATH" \
             -F "data={\"custom_id\": \"$CUSTOM_ID\"}")
 
           APP_URL=$(echo $RESPONSE | jq -r .app_url)
-          
+
           if [ "$APP_URL" == "null" ] || [ -z "$APP_URL" ]; then
             echo "❌ Upload Failed!"
             echo "Response: $RESPONSE"
@@ -70,7 +93,7 @@ jobs:
             -f body="### 🏥 Medical App Build Ready
             **Branch:** \`${{ github.ref_name }}\`
             
-            The build is ready on BrowserStack App Live.
+            The build is live on BrowserStack.
             
             1. [**Go to BrowserStack Dashboard**]($DASHBOARD_LINK)
             2. Select App: **\`$APP_NAME\`**"
