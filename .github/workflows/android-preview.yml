@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   build-and-upload:
@@ -28,28 +29,32 @@ jobs:
       - name: 🔨 Build APK
         run: flutter build apk --release
 
-      # --- RENAME STEP (New!) ---
+      # --- RENAME STEP (Fixed) ---
       - name: 🏷 Rename APK
         id: rename
         run: |
-          # 1. Clean branch name (replace / with -)
+          # 1. Get Repo Name (App Name) and Clean Branch Name
+          REPO_NAME="${{ github.event.repository.name }}"
           SAFE_BRANCH=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
           
           # 2. Define filenames
+          # Input: Standard Flutter output
           OLD_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          NEW_NAME="MedicalApp_$SAFE_BRANCH.apk"
-          NEW_PATH="build/app/outputs/flutter-apk/$NEW_NAME"
+          
+          # Output: repoName_branchName.apk
+          NEW_FILENAME="${REPO_NAME}_${SAFE_BRANCH}.apk"
+          NEW_PATH="build/app/outputs/flutter-apk/$NEW_FILENAME"
           
           # 3. Rename the file
           mv $OLD_PATH $NEW_PATH
           
-          echo "✅ Renamed APK to: $NEW_NAME"
+          echo "✅ Renamed APK to: $NEW_FILENAME"
           
           # 4. Save variables for the next step
           echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
-          echo "custom_id=MedicalApp_$SAFE_BRANCH" >> $GITHUB_OUTPUT
+          echo "custom_id=${REPO_NAME}_${SAFE_BRANCH}" >> $GITHUB_OUTPUT
 
-      # --- UPLOAD STEP (Updated) ---
+      # --- UPLOAD STEP (BrowserStack) ---
       - name: ☁️ Upload to BrowserStack API
         id: browserstack
         env:
@@ -61,7 +66,8 @@ jobs:
           echo "🚀 Uploading file: $APK_PATH"
           echo "🏷  Target Custom ID: $CUSTOM_ID"
 
-          # Upload via API (Notice we use $APK_PATH now)
+          # Upload via API
+          # We force the 'custom_id' so BrowserStack overwrites the previous build for this branch
           RESPONSE=$(curl -u "$BS_USER:$BS_KEY" \
             -X POST "https://api-cloud.browserstack.com/app-live/upload" \
             -F "file=@$APK_PATH" \
@@ -79,6 +85,13 @@ jobs:
           echo "dashboard_url=https://app-live.browserstack.com/dashboard" >> $GITHUB_OUTPUT
           echo "app_name=$CUSTOM_ID" >> $GITHUB_OUTPUT
 
+      # --- OPTIONAL: Standard Artifact Upload (To download from GitHub) ---
+      - name: 📦 Store Artifact on GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.rename.outputs.custom_id }}
+          path: ${{ steps.rename.outputs.apk_path }}
+
       - name: 💬 Post Link to Commit
         if: success()
         env:
@@ -92,6 +105,7 @@ jobs:
             /repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
             -f body="### 🏥 Medical App Build Ready
             **Branch:** \`${{ github.ref_name }}\`
+            **File:** \`${APP_NAME}.apk\`
             
             The build is live on BrowserStack.
             
