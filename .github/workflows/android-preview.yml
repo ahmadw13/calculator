@@ -1,17 +1,15 @@
-name: Live Preview (Commit)
+name: BrowserStack Upload
 
-# TRIGGER: Runs on ANY push to ANY branch
 on:
   push:
     branches:
       - '**'
 
 permissions:
-  contents: write # Required to post comments on commits
+  contents: write
 
 jobs:
-  build-and-preview:
-    name: Build & Preview
+  build-and-upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,38 +25,52 @@ jobs:
       - name: 📦 Get Dependencies
         run: flutter pub get
 
-      # Build Release APK
       - name: 🔨 Build APK
         run: flutter build apk --release
 
-      # --- NEW STEP: Use the Official Action ---
-      - name: 📱 Upload to Appetize
-        id: appetize # ID is important so we can read the output later
-        uses: appetizeio/github-action-appetize@v1.0.5
-        with:
-          apiToken: ${{ secrets.APPETIZE_TOKEN }}
-          appFile: "build/app/outputs/flutter-apk/app-release.apk"
-          platform: "android"
-          note: "Commit: ${{ github.sha }}"
+      - name: ☁️ Upload to BrowserStack API
+        id: browserstack
+        env:
+          BS_USER: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          echo "🚀 Uploading Branch: $BRANCH_NAME..."
+          SAFE_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
+          CUSTOM_ID="MedicalApp_$SAFE_BRANCH"
+          
+          RESPONSE=$(curl -u "$BS_USER:$BS_KEY" \
+            -X POST "https://api-cloud.browserstack.com/app-live/upload" \
+            -F "file=@build/app/outputs/flutter-apk/app-release.apk" \
+            -F "data={\"custom_id\": \"$CUSTOM_ID\"}")
 
-      # --- COMMENT STEP ---
-      - name: 💬 Post Preview Link
+          APP_URL=$(echo $RESPONSE | jq -r .app_url)
+          
+          if [ "$APP_URL" == "null" ] || [ -z "$APP_URL" ]; then
+            echo "❌ Upload Failed!"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          
+          echo "✅ Upload Success!"
+          echo "dashboard_url=https://app-live.browserstack.com/dashboard" >> $GITHUB_OUTPUT
+          echo "app_name=$CUSTOM_ID" >> $GITHUB_OUTPUT
+
+      - name: 💬 Post Link to Commit
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # We get the PublicKey from the previous step using 'steps.appetize.outputs.publicKey'
-          PUBLIC_KEY: ${{ steps.appetize.outputs.publicKey }}
+          DASHBOARD_LINK: ${{ steps.browserstack.outputs.dashboard_url }}
+          APP_NAME: ${{ steps.browserstack.outputs.app_name }}
         run: |
-          # Construct the link
-          PREVIEW_URL="https://appetize.io/embed/$PUBLIC_KEY?device=pixel7&scale=75&autoplay=true&orientation=portrait&osVersion=13.0"
-          
-          echo "✅ Link Generated: $PREVIEW_URL"
-
-          # Post Comment to Commit
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
-            -f body="### 📱 Mobile Preview Ready
+            -f body="### 🏥 Medical App Build Ready
             **Branch:** \`${{ github.ref_name }}\`
             
-            [**▶️ Click here to Test this Commit**]($PREVIEW_URL)"
+            The build is ready on BrowserStack App Live.
+            
+            1. [**Go to BrowserStack Dashboard**]($DASHBOARD_LINK)
+            2. Select App: **\`$APP_NAME\`**"
