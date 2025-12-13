@@ -79,8 +79,6 @@ class _CalculatorState extends State<Calculator> {
         _output = _output + buttonText;
       }
     }
-
-    // Remove .0 if the result is a whole number (e.g. 5.0 -> 5)
     if (_output.endsWith(".0")) {
        _output = _output.substring(0, _output.length - 2);
     }
@@ -90,7 +88,6 @@ class _CalculatorState extends State<Calculator> {
     });
   }
 
-  // --- UI Helper Widget ---
   Widget buildButton(String buttonText, Color buttonColor, Color textColor) {
     return Expanded(
       child: Container(
@@ -117,7 +114,6 @@ class _CalculatorState extends State<Calculator> {
 
   @override
   Widget build(BuildContext context) {
-    // We define our colors here for consistency
     const Color greyBtn = Color(0xFF333333); 
     const Color amberBtn = Colors.amber;
     const Color lightGreyBtn = Color(0xFFA5A5A5);
@@ -126,7 +122,6 @@ class _CalculatorState extends State<Calculator> {
       backgroundColor: Colors.black, // Dark background
       body: Column(
         children: <Widget>[
-          // Display Area
           Expanded(
             child: Container(
               alignment: Alignment.bottomRight,
@@ -142,8 +137,6 @@ class _CalculatorState extends State<Calculator> {
               ),
             ),
           ),
-          
-          // Button Area
           Column(children: [
             Row(children: [
               buildButton("C", lightGreyBtn, Colors.black),
