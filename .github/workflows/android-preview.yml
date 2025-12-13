@@ -1,4 +1,4 @@
-name: BrowserStack Upload
+name: App Live Test
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   build-and-upload:
@@ -28,24 +29,52 @@ jobs:
       - name: 🔨 Build APK
         run: flutter build apk --release
 
+      # --- RENAME STEP ---
+      - name: 🏷 Rename APK
+        id: rename
+        run: |
+          # 1. Get Repo Name and Clean Branch Name
+          REPO_NAME="${{ github.event.repository.name }}"
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          
+          # 2. Define filenames
+          # Input: Standard Flutter output
+          OLD_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          
+          # Output: repoName_branchName.apk
+          NEW_FILENAME="${REPO_NAME}_${SAFE_BRANCH}.apk"
+          NEW_PATH="build/app/outputs/flutter-apk/$NEW_FILENAME"
+          
+          # 3. Rename the file
+          mv $OLD_PATH $NEW_PATH
+          
+          echo "✅ Renamed APK to: $NEW_FILENAME"
+          
+          # 4. Save variables for the next step
+          echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
+          echo "custom_id=${REPO_NAME}_${SAFE_BRANCH}" >> $GITHUB_OUTPUT
+
+      # --- UPLOAD STEP (BrowserStack) ---
       - name: ☁️ Upload to BrowserStack API
         id: browserstack
         env:
           BS_USER: ${{ secrets.BROWSERSTACK_USERNAME }}
           BS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
-          BRANCH_NAME: ${{ github.ref_name }}
+          APK_PATH: ${{ steps.rename.outputs.apk_path }}
+          CUSTOM_ID: ${{ steps.rename.outputs.custom_id }}
         run: |
-          echo "🚀 Uploading Branch: $BRANCH_NAME..."
-          SAFE_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
-          CUSTOM_ID="MedicalApp_$SAFE_BRANCH"
-          
+          echo "🚀 Uploading file: $APK_PATH"
+          echo "🏷  Target Custom ID: $CUSTOM_ID"
+
+          # Upload via API
+          # We force the 'custom_id' so BrowserStack overwrites the previous build for this branch
           RESPONSE=$(curl -u "$BS_USER:$BS_KEY" \
             -X POST "https://api-cloud.browserstack.com/app-live/upload" \
-            -F "file=@build/app/outputs/flutter-apk/app-release.apk" \
+            -F "file=@$APK_PATH" \
             -F "data={\"custom_id\": \"$CUSTOM_ID\"}")
 
           APP_URL=$(echo $RESPONSE | jq -r .app_url)
-          
+
           if [ "$APP_URL" == "null" ] || [ -z "$APP_URL" ]; then
             echo "❌ Upload Failed!"
             echo "Response: $RESPONSE"
@@ -56,6 +85,14 @@ jobs:
           echo "dashboard_url=https://app-live.browserstack.com/dashboard" >> $GITHUB_OUTPUT
           echo "app_name=$CUSTOM_ID" >> $GITHUB_OUTPUT
 
+      # --- OPTIONAL: Standard Artifact Upload ---
+      - name: 📦 Store Artifact on GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.rename.outputs.custom_id }}
+          path: ${{ steps.rename.outputs.apk_path }}
+
+      # --- COMMENT ON COMMIT ---
       - name: 💬 Post Link to Commit
         if: success()
         env:
@@ -67,10 +104,41 @@ jobs:
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
-            -f body="### 🏥 Medical App Build Ready
+            -f body="### 📱 App Build Ready
             **Branch:** \`${{ github.ref_name }}\`
+            **File:** \`${APP_NAME}.apk\`
             
-            The build is ready on BrowserStack App Live.
+            The build is live on BrowserStack.
             
             1. [**Go to BrowserStack Dashboard**]($DASHBOARD_LINK)
             2. Select App: **\`$APP_NAME\`**"
+
+      # --- NOTIFY DISCORD ---
+      - name: 🔔 Notify Discord
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          APP_NAME: ${{ steps.browserstack.outputs.app_name }}
+          DASHBOARD_URL: ${{ steps.browserstack.outputs.dashboard_url }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{
+                     \"username\": \"App Builder\",
+                     \"avatar_url\": \"https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png\",
+                     \"content\": \"🚀 **Build Successful!**\",
+                     \"embeds\": [{
+                       \"title\": \"📱 App Ready on BrowserStack\",
+                       \"description\": \"A new APK has been renamed and uploaded successfully.\",
+                       \"color\": 3066993,
+                       \"fields\": [
+                         { \"name\": \"📦 App Name (ID)\", \"value\": \"\`$APP_NAME\`\", \"inline\": true },
+                         { \"name\": \"🌿 Branch\", \"value\": \"\`$BRANCH\`\", \"inline\": true },
+                         { \"name\": \"👤 Triggered By\", \"value\": \"$ACTOR\", \"inline\": true }
+                       ],
+                       \"url\": \"$DASHBOARD_URL\"
+                     }]
+                   }" \
+               $DISCORD_WEBHOOK
