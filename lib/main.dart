@@ -176,7 +176,7 @@ class _CalculatorState extends State<Calculator> {
               buildButton(".", greyBtn, Colors.white),
               buildButton("=", amberBtn, Colors.white),
             ]),
-            const SizedBox(height: 10), // Bottom padding
+            const SizedBox(height: 10), //padding
           ])
         ],
       ),
