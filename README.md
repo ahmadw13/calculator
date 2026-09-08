@@ -1,16 +1,11 @@
 # calculator
 
-A new Flutter project.
+A clean, cross-platform calculator application built with Flutter and Dart, supporting mobile and desktop platforms with native C++ runners.
 
-## Getting Started
+## Overview
+- Framework: Flutter (Dart)
+- Desktop Embeddings: C++ runner (Windows / Desktop)
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Features
+- Standard arithmetic calculations.
+- Adaptive UI layout responsive to both mobile touch and desktop window resize.
